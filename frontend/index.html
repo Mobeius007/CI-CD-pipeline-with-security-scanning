@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevSecOps Control Plane — Universal Microservice Dashboard</title>
+  <meta name="description" content="Configurable universal DevSecOps control plane and microservice inspector for Python, Laravel, Node.js, Go, and Java architectures.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">DevSecOps Control Plane</h1>
+        <p class="brand-subtitle">Universal Multi-Architecture Pipeline & Telemetry Hub</p>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <!-- Active Target Switcher -->
+      <div class="project-selector-wrapper">
+        <label for="project-preset-select" class="selector-label">Architecture:</label>
+        <select id="project-preset-select" class="preset-dropdown">
+          <option value="python" selected>🐍 Python (Flask / Gunicorn)</option>
+          <option value="php">🐘 PHP / Laravel (FixHR)</option>
+          <option value="nodejs">⚡ Node.js (Express / TypeScript)</option>
+          <option value="golang">🐹 Go (Distroless / Gin)</option>
+          <option value="java">☕ Java (Spring Boot / Temurin)</option>
+          <option value="custom">⚙️ Custom Microservice...</option>
+        </select>
+      </div>
+
+      <div class="connection-status badge-live" id="global-status-badge">
+        <span class="status-pulse"></span>
+        <span id="global-status-text">Engine Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="dashboard-container">
+    <!-- Row 1: Target Endpoint Config & Live Health Probe -->
+    <section class="dashboard-grid grid-top">
+      <!-- Card 1: Configurable Target Settings -->
+      <div class="card config-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon">🎛️</span>
+            <h2>Target Environment Configuration</h2>
+          </div>
+          <span class="badge" id="current-lang-badge">Python 3.12</span>
+        </div>
+        
+        <form id="target-config-form" class="config-form" onsubmit="event.preventDefault();">
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="app-name-input">Application / Service Name</label>
+              <input type="text" id="app-name-input" value="devsecops-demo" placeholder="e.g. fixhr">
+            </div>
+            <div class="form-group flex-1">
+              <label for="app-port-input">Target Port</label>
+              <input type="number" id="app-port-input" value="5000" placeholder="5000">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="target-host-input">Host / Base URL</label>
+              <input type="text" id="target-host-input" value="http://127.0.0.1:5000" placeholder="http://127.0.0.1:5000">
+            </div>
+            <div class="form-group flex-1">
+              <label for="health-path-input">Health Probe Path</label>
+              <input type="text" id="health-path-input" value="/health" placeholder="/health">
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="btn-ping-service" class="btn btn-primary">
+              <span class="btn-icon">⚡</span> Run Live Health Probe
+            </button>
+            <button type="button" id="btn-test-root" class="btn btn-secondary">
+              <span class="btn-icon">🌐</span> Query Root Endpoint
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Card 2: Live Health Probe Telemetry & Inspector -->
+      <div class="card probe-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon">🩺</span>
+            <h2>Live Service Telemetry & Probe</h2>
+          </div>
+          <span class="badge badge-neutral" id="probe-latency-badge">-- ms</span>
+        </div>
+
+        <div class="probe-display">
+          <div class="probe-status-bar">
+            <div class="status-indicator" id="probe-status-indicator"></div>
+            <div class="probe-status-meta">
+              <div class="probe-url" id="probe-url-text">http://127.0.0.1:5000/health</div>
+              <div class="probe-subtext" id="probe-status-subtext">Click "Run Live Health Probe" to test</div>
+            </div>
+            <span class="http-status-code" id="http-code-tag">READY</span>
+          </div>
+
+          <!-- Response JSON Viewer -->
+          <div class="json-viewer-container">
+            <div class="json-viewer-header">
+              <span>Response Payload</span>
+              <button class="btn-copy" id="btn-copy-json" title="Copy JSON">Copy</button>
+            </div>
+            <pre id="json-response-display" class="json-code"><code>// Waiting for probe execution...</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 2: DevSecOps 4-Stage Pipeline Flow & Live Simulation -->
+    <section class="card pipeline-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="card-icon">🚀</span>
+          <h2>Automated DevSecOps Pipeline Stages</h2>
+        </div>
+        <div class="pipeline-actions">
+          <button id="btn-simulate-pipeline" class="btn btn-accent">
+            <span class="btn-icon">▶</span> Simulate Full Pipeline
+          </button>
+          <button id="btn-toggle-failure" class="btn btn-outline" title="Toggle security vulnerability simulation">
+            Simulate Security Failure: <span id="failure-toggle-state" class="state-off">OFF</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="pipeline-stages-grid">
+        <!-- Stage 1 -->
+        <div class="pipeline-step" id="stage-step-1">
+          <div class="step-badge">Stage 1</div>
+          <div class="step-icon-wrapper" id="step-icon-1">🛡️</div>
+          <h3 class="step-title">Test & SAST</h3>
+          <p class="step-desc" id="step-1-desc">Pytest Unit Tests + Bandit Security AST Scan</p>
+          <div class="step-status-chip status-pending" id="step-chip-1">Pending</div>
+        </div>
+
+        <div class="pipeline-connector" id="connector-1"></div>
+
+        <!-- Stage 2 -->
+        <div class="pipeline-step" id="stage-step-2">
+          <div class="step-badge">Stage 2</div>
+          <div class="step-icon-wrapper" id="step-icon-2">📦</div>
+          <h3 class="step-title">Build & Scan</h3>
+          <p class="step-desc">Docker Buildx + Trivy Container CVE Gate</p>
+          <div class="step-status-chip status-pending" id="step-chip-2">Pending</div>
+        </div>
+
+        <div class="pipeline-connector" id="connector-2"></div>
+
+        <!-- Stage 3 -->
+        <div class="pipeline-step" id="stage-step-3">
+          <div class="step-badge">Stage 3</div>
+          <div class="step-icon-wrapper" id="step-icon-3">☸️</div>
+          <h3 class="step-title">K8s Staging</h3>
+          <p class="step-desc">KinD Cluster Rollout + Smoke Probes + Auto-Rollback</p>
+          <div class="step-status-chip status-pending" id="step-chip-3">Pending</div>
+        </div>
+
+        <div class="pipeline-connector" id="connector-3"></div>
+
+        <!-- Stage 4 -->
+        <div class="pipeline-step" id="stage-step-4">
+          <div class="step-badge">Stage 4</div>
+          <div class="step-icon-wrapper" id="step-icon-4">🚢</div>
+          <h3 class="step-title">Release to GHCR</h3>
+          <p class="step-desc">Publish Verified Image Tagged with Git SHA</p>
+          <div class="step-status-chip status-pending" id="step-chip-4">Pending</div>
+        </div>
+      </div>
+
+      <!-- Live Terminal Simulation Output -->
+      <div class="terminal-container">
+        <div class="terminal-header">
+          <div class="terminal-buttons">
+            <span class="t-btn t-close"></span>
+            <span class="t-btn t-min"></span>
+            <span class="t-btn t-max"></span>
+          </div>
+          <span class="terminal-title">CI/CD Execution Log Stream</span>
+          <button class="btn-clear-terminal" id="btn-clear-term">Clear Logs</button>
+        </div>
+        <div class="terminal-body" id="pipeline-terminal-body">
+          <div class="term-line info">[System] DevSecOps Pipeline Control Engine Initialized.</div>
+          <div class="term-line info">[System] Ready to run live probes or simulated verification against target architecture.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 3: Security Telemetry & Artifact Generator -->
+    <section class="dashboard-grid grid-bottom">
+      <!-- Security Posture Gauges -->
+      <div class="card security-metrics-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon">📊</span>
+            <h2>Security Posture Telemetry</h2>
+          </div>
+          <span class="badge badge-success" id="overall-grade-badge">Grade A+</span>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <span class="metric-label">Critical CVEs</span>
+            <span class="metric-val val-safe" id="cve-critical-count">0</span>
+            <span class="metric-hint">Blocked by Trivy Gate</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">High Severity</span>
+            <span class="metric-val val-safe" id="cve-high-count">0</span>
+            <span class="metric-hint">Zero Tolerance Policy</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">SAST Violations</span>
+            <span class="metric-val val-safe" id="sast-violations-count">0</span>
+            <span class="metric-hint">AST Code Scan</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Pod Security</span>
+            <span class="metric-val val-accent" id="pod-security-standard">Restricted</span>
+            <span class="metric-hint">Non-Root & ReadOnlyRoot</span>
+          </div>
+        </div>
+
+        <!-- Compliance Checklist -->
+        <div class="compliance-checklist">
+          <div class="compliance-item check-pass">
+            <span class="check-icon">✓</span>
+            <span>Non-Root User Enforcement (UID 10001)</span>
+          </div>
+          <div class="compliance-item check-pass">
+            <span class="check-icon">✓</span>
+            <span>Read-Only Root Filesystem with /tmp emptyDir</span>
+          </div>
+          <div class="compliance-item check-pass">
+            <span class="check-icon">✓</span>
+            <span>Dropped All Linux Kernel Capabilities</span>
+          </div>
+          <div class="compliance-item check-pass">
+            <span class="check-icon">✓</span>
+            <span>Zero-Downtime RollingUpdate & Health Probes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Polyglot Manifest & Code Generator -->
+      <div class="card generator-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon">📄</span>
+            <h2>Polyglot Artifact Generator</h2>
+          </div>
+          <div class="tab-group">
+            <button class="tab-btn active" data-tab="workflow">GitHub Actions</button>
+            <button class="tab-btn" data-tab="dockerfile">Dockerfile</button>
+            <button class="tab-btn" data-tab="k8s">Kubernetes</button>
+          </div>
+        </div>
+
+        <div class="code-generator-wrapper">
+          <div class="code-header-bar">
+            <span class="code-file-name" id="gen-filename">.github/workflows/ci.yml</span>
+            <button class="btn btn-sm btn-outline" id="btn-copy-generated">Copy File</button>
+          </div>
+          <pre class="generated-code"><code id="code-output-area"># Loading template...</code></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <p>DevSecOps CI/CD Pipeline with Security Scanning • Connected to <a href="https://github.com/Mobeius007/CI-CD-pipeline-with-security-scanning" target="_blank" rel="noopener">Mobeius007/CI-CD-pipeline-with-security-scanning</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

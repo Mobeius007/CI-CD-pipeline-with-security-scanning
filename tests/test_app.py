@@ -36,3 +36,10 @@ def test_non_existent_route(client):
     """Verify that requesting an unregistered path returns 404 Not Found."""
     response = client.get("/invalid-route")
     assert response.status_code == 404
+
+
+def test_dashboard_endpoint(client):
+    """Verify that GET /dashboard serves the control plane frontend."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    assert b"DevSecOps Control Plane" in response.data

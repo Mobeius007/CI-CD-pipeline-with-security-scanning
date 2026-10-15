@@ -19,8 +19,9 @@ COPY requirements.txt .
 # Install dependencies without pip cache to minimize image size and attack surface
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code
+# Copy application source code and frontend
 COPY app/ ./app/
+COPY frontend/ ./frontend/
 
 # Set ownership to non-root user
 RUN chown -R 10001:10001 /app

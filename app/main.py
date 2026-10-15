@@ -5,11 +5,21 @@ Runs securely via Gunicorn in containerized environments.
 """
 
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 
-app = Flask(__name__)
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+app = Flask(__name__, static_folder=frontend_dir, static_url_path="")
 
 APP_VERSION = "1.0.0"
+
+
+@app.after_request
+def add_cors_headers(response):
+    """Enable CORS so web browsers and dashboards can query health telemetry."""
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,OPTIONS"
+    return response
 
 
 @app.route("/", methods=["GET"])
@@ -28,6 +38,12 @@ def health():
     return jsonify({
         "status": "ok"
     }), 200
+
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    """Serve the universal DevSecOps control plane frontend dashboard."""
+    return send_from_directory(frontend_dir, "index.html")
 
 
 if __name__ == "__main__":
