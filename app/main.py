@@ -4,6 +4,7 @@ Provides minimal microservice endpoints for service discovery and health checks.
 Runs securely via Gunicorn in containerized environments.
 """
 
+import os
 from flask import Flask, jsonify
 
 app = Flask(__name__)
@@ -32,4 +33,5 @@ def health():
 if __name__ == "__main__":
     # Bound to loopback interface for local manual testing only.
     # Production traffic is served via Gunicorn WSGI server.
-    app.run(host="127.0.0.1", port=8000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="127.0.0.1", port=port)
