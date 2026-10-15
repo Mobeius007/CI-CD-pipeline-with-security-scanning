@@ -521,6 +521,147 @@ spec:
     });
   });
 
+  // =========================================================================
+  // Embed Engine Live Integration Controller
+  // =========================================================================
+  const embedModalOverlay = document.getElementById('embed-modal-overlay');
+  const btnOpenEmbedModal = document.getElementById('btn-open-embed-modal');
+  const btnCloseEmbedModal = document.getElementById('btn-close-embed-modal');
+  const mTabBtns = document.querySelectorAll('.m-tab-btn');
+
+  // Check URL for ?embed=true
+  if (new URLSearchParams(window.location.search).get('embed') === 'true') {
+    document.body.classList.add('is-embedded');
+  }
+
+  if (btnOpenEmbedModal) {
+    btnOpenEmbedModal.addEventListener('click', () => {
+      updateEmbedSnippets();
+      embedModalOverlay.classList.add('open');
+    });
+  }
+
+  if (btnCloseEmbedModal) {
+    btnCloseEmbedModal.addEventListener('click', () => {
+      embedModalOverlay.classList.remove('open');
+    });
+  }
+
+  embedModalOverlay.addEventListener('click', (e) => {
+    if (e.target === embedModalOverlay) {
+      embedModalOverlay.classList.remove('open');
+    }
+  });
+
+  // Modal Tab Switching
+  mTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      mTabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tabTarget = btn.getAttribute('data-embed-tab');
+      document.querySelectorAll('.embed-tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      const activeContent = document.getElementById(`tab-content-${tabTarget}`);
+      if (activeContent) activeContent.classList.add('active');
+    });
+  });
+
+  function updateEmbedSnippets() {
+    const origin = window.location.origin;
+    const appName = appNameInput.value || 'devsecops-app';
+    const healthPath = healthPathInput.value || '/health';
+    const langKey = presetSelect.value;
+
+    // 1. Script Widget
+    const widgetCode = `<script src="${origin}/embed/widget.js" data-host="${origin}" data-app="${appName}" data-probe="${healthPath}"></script>`;
+    const widgetEl = document.getElementById('embed-code-widget');
+    if (widgetEl) widgetEl.textContent = widgetCode;
+
+    // 2. iFrame Code
+    const iframeCode = `<iframe src="${origin}/dashboard?embed=true" width="100%" height="700" frameborder="0" style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);"></iframe>`;
+    const iframeEl = document.getElementById('embed-code-iframe');
+    if (iframeEl) iframeEl.textContent = iframeCode;
+
+    // 3. Badges Markdown
+    const badgeStatusMd = `[![DevSecOps Status](${origin}/api/badge/status)](${origin}/dashboard)`;
+    const badgeSecMd = `[![Security Grade](${origin}/api/badge/security)](${origin}/dashboard)`;
+    const badgeStatusEl = document.getElementById('embed-code-badge-status');
+    const badgeSecEl = document.getElementById('embed-code-badge-security');
+    if (badgeStatusEl) badgeStatusEl.textContent = badgeStatusMd;
+    if (badgeSecEl) badgeSecEl.textContent = badgeSecMd;
+
+    // 4. SDK Health Route Snippet
+    const sdkEl = document.getElementById('embed-code-sdk');
+    if (sdkEl) {
+      if (langKey === 'php') {
+        sdkEl.textContent = `// PHP Laravel: routes/web.php or routes/api.php
+use Illuminate\\Support\\Facades\\Route;
+
+Route::get('${healthPath}', function () {
+    return response()->json([
+        'status' => 'ok',
+        'service' => '${appName}',
+        'timestamp' => now()->toISOString()
+    ]);
+});`;
+      } else if (langKey === 'nodejs') {
+        sdkEl.textContent = `// Node.js Express: server.js or app.ts
+app.get('${healthPath}', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: '${appName}',
+    timestamp: new Date().toISOString()
+  });
+});`;
+      } else if (langKey === 'golang') {
+        sdkEl.textContent = `// Go: Gin or standard net/http router
+r.GET("${healthPath}", func(c *gin.Context) {
+    c.JSON(http.StatusOK, gin.H{
+        "status": "ok",
+        "service": "${appName}",
+    })
+})`;
+      } else if (langKey === 'java') {
+        sdkEl.textContent = `// Java Spring Boot: HealthController.java
+@RestController
+public class HealthController {
+    @GetMapping("${healthPath}")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of(
+            "status", "ok",
+            "service", "${appName}"
+        ));
+    }
+}`;
+      } else {
+        sdkEl.textContent = `# Python Flask / FastAPI
+@app.route("${healthPath}", methods=["GET"])
+def health():
+    return {"status": "ok", "service": "${appName}"}, 200`;
+      }
+    }
+  }
+
+  // Copy Handlers for Embed Modal
+  function bindCopyBtn(btnId, targetId, defaultLabel) {
+    const btn = document.getElementById(btnId);
+    const target = document.getElementById(targetId);
+    if (!btn || !target) return;
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(target.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = defaultLabel, 1500);
+      });
+    });
+  }
+
+  bindCopyBtn('btn-copy-widget-code', 'embed-code-widget', 'Copy Script Tag');
+  bindCopyBtn('btn-copy-iframe-code', 'embed-code-iframe', 'Copy iFrame Code');
+  bindCopyBtn('btn-copy-badge-status', 'embed-code-badge-status', 'Copy Markdown');
+  bindCopyBtn('btn-copy-badge-security', 'embed-code-badge-security', 'Copy Markdown');
+  bindCopyBtn('btn-copy-sdk-code', 'embed-code-sdk', 'Copy Route Snippet');
+
   // Initial load
   applyPreset('python');
 });

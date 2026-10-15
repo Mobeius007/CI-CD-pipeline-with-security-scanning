@@ -40,6 +40,11 @@
         </select>
       </div>
 
+      <!-- Embed Engine Modal Trigger -->
+      <button type="button" id="btn-open-embed-modal" class="btn btn-sm btn-accent">
+        <span class="btn-icon">⚡</span> Embed in Live App
+      </button>
+
       <div class="connection-status badge-live" id="global-status-badge">
         <span class="status-pulse"></span>
         <span id="global-status-text">Engine Ready</span>
@@ -291,6 +296,96 @@
   <footer class="app-footer">
     <p>DevSecOps CI/CD Pipeline with Security Scanning • Connected to <a href="https://github.com/Mobeius007/CI-CD-pipeline-with-security-scanning" target="_blank" rel="noopener">Mobeius007/CI-CD-pipeline-with-security-scanning</a></p>
   </footer>
+
+  <!-- Embed Engine Modal -->
+  <div class="modal-overlay" id="embed-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">⚡</span>
+          <div>
+            <h3>Embed Engine Into Live Project</h3>
+            <p class="modal-subtitle">Integrate real-time security scanning, telemetry & health probes into your running applications.</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-embed-modal">&times;</button>
+      </div>
+
+      <div class="modal-tab-group">
+        <button class="m-tab-btn active" data-embed-tab="widget">Floating Widget (1-Line JS)</button>
+        <button class="m-tab-btn" data-embed-tab="iframe">Embedded Dashboard (iFrame)</button>
+        <button class="m-tab-btn" data-embed-tab="badge">Live SVG Badges</button>
+        <button class="m-tab-btn" data-embed-tab="sdk">Project Health Route</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Tab 1: Widget -->
+        <div class="embed-tab-content active" id="tab-content-widget">
+          <p class="embed-instructions">
+            Drop this single script tag into your live web app (HTML head, Laravel Blade, React index.html, Vue, or PHP template). It injects a sleek floating health indicator with live telemetry:
+          </p>
+          <div class="embed-code-box">
+            <pre><code id="embed-code-widget">&lt;script src="http://127.0.0.1:5000/embed/widget.js" data-host="http://127.0.0.1:5000" data-app="devsecops-app" data-probe="/health"&gt;&lt;/script&gt;</code></pre>
+            <button class="btn btn-sm btn-primary" id="btn-copy-widget-code">Copy Script Tag</button>
+          </div>
+          <div class="embed-preview-banner">
+            <span class="preview-badge">Live Preview</span>
+            <div class="preview-pill">
+              <span class="status-pulse"></span>
+              <span>DevSecOps: Healthy (12ms) • Grade A+</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: iFrame -->
+        <div class="embed-tab-content" id="tab-content-iframe">
+          <p class="embed-instructions">
+            Embed the entire real-time control plane directly inside your admin panel, developer portal, or internal dashboard:
+          </p>
+          <div class="embed-code-box">
+            <pre><code id="embed-code-iframe">&lt;iframe src="http://127.0.0.1:5000/dashboard?embed=true" width="100%" height="700" frameborder="0" style="border-radius: 12px;"&gt;&lt;/iframe&gt;</code></pre>
+            <button class="btn btn-sm btn-primary" id="btn-copy-iframe-code">Copy iFrame Code</button>
+          </div>
+        </div>
+
+        <!-- Tab 3: Badges -->
+        <div class="embed-tab-content" id="tab-content-badge">
+          <p class="embed-instructions">
+            Real-time dynamic SVG badges to paste into your GitHub README or project documentation:
+          </p>
+          <div class="badge-embed-grid">
+            <div class="badge-embed-item">
+              <span class="badge-type">Pipeline Status</span>
+              <img src="/api/badge/status" alt="Pipeline Status" class="live-badge-img">
+              <div class="embed-code-box small">
+                <pre><code id="embed-code-badge-status">[![DevSecOps Status](http://127.0.0.1:5000/api/badge/status)](http://127.0.0.1:5000/dashboard)</code></pre>
+                <button class="btn btn-sm btn-secondary" id="btn-copy-badge-status">Copy Markdown</button>
+              </div>
+            </div>
+            <div class="badge-embed-item">
+              <span class="badge-type">Security Posture</span>
+              <img src="/api/badge/security" alt="Security Posture" class="live-badge-img">
+              <div class="embed-code-box small">
+                <pre><code id="embed-code-badge-security">[![Security Grade](http://127.0.0.1:5000/api/badge/security)](http://127.0.0.1:5000/dashboard)</code></pre>
+                <button class="btn btn-sm btn-secondary" id="btn-copy-badge-security">Copy Markdown</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: SDK Health Route -->
+        <div class="embed-tab-content" id="tab-content-sdk">
+          <p class="embed-instructions">
+            Add this 3-line health endpoint to your live project so this engine can probe it in real time:
+          </p>
+          <div class="embed-code-box">
+            <pre><code id="embed-code-sdk"># Loading snippet...</code></pre>
+            <button class="btn btn-sm btn-primary" id="btn-copy-sdk-code">Copy Route Snippet</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

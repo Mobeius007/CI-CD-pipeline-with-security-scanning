@@ -43,3 +43,27 @@ def test_dashboard_endpoint(client):
     response = client.get("/dashboard")
     assert response.status_code == 200
     assert b"DevSecOps Control Plane" in response.data
+
+
+def test_embed_widget_endpoint(client):
+    """Verify that GET /embed/widget.js serves embeddable widget script."""
+    response = client.get("/embed/widget.js")
+    assert response.status_code == 200
+    assert b"devsecops-embed-widget" in response.data
+
+
+def test_badge_status_endpoint(client):
+    """Verify that GET /api/badge/status returns SVG status badge."""
+    response = client.get("/api/badge/status")
+    assert response.status_code == 200
+    assert response.content_type.startswith("image/svg+xml")
+    assert b"devsecops" in response.data
+    assert b"healthy" in response.data
+
+
+def test_badge_security_endpoint(client):
+    """Verify that GET /api/badge/security returns SVG security badge."""
+    response = client.get("/api/badge/security")
+    assert response.status_code == 200
+    assert response.content_type.startswith("image/svg+xml")
+    assert b"grade A+" in response.data
