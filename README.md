@@ -221,7 +221,43 @@ devsecops-cicd-pipeline/
 ├── .dockerignore                # Build context exclusion rules
 ├── .gitignore                   # Version control exclusion rules
 ├── Dockerfile                   # python:3.12-slim with non-root UID 10001
+├── presets/                     # Multi-architecture hardened templates
+│   ├── php-laravel/             # PHP 8.3 / Laravel Dockerfile & config (e.g. FixHR)
+│   ├── nodejs/                  # Node.js 20 / TypeScript hardened Dockerfile
+│   ├── golang/                  # Go 1.22 Distroless static binary Dockerfile
+│   ├── java-spring/             # Java 17 Eclipse Temurin Spring Boot Dockerfile
+│   └── README.md                # Polyglot architecture guide
 ├── requirements.txt             # Pinned production dependencies (Flask, Gunicorn)
 ├── requirements-dev.txt         # Pinned dev/test dependencies (Bandit, Pytest)
 └── README.md                    # Project documentation, architecture & runbook
 ```
+
+---
+
+## 🌐 Universal Multi-Architecture & Polyglot Support
+
+This repository functions both as a standalone microservice pipeline and as a **centralized, reusable DevSecOps engine** for any programming language or architecture (PHP/Laravel, Node.js, Go, Java, Python).
+
+### Method 1: Centralized Reusable Workflow
+Any repository (e.g., `fixhr`, `billing-service`) can use this pipeline by adding a 5-line workflow file:
+
+```yaml
+name: DevSecOps Pipeline
+on: [push, pull_request]
+
+jobs:
+  devsecops:
+    uses: Mobeius007/CI-CD-pipeline-with-security-scanning/.github/workflows/reusable-devsecops.yml@main
+    with:
+      app_name: 'fixhr'
+      language: 'php'           # or 'auto', 'nodejs', 'golang', 'java', 'python'
+      health_endpoint: '/up'    # '/up' for Laravel 11, '/health' for Python/Node, '/actuator/health' for Java
+      port: 8000
+```
+
+### Method 2: Drop-in Stack Presets (`presets/`)
+To containerize any language with matching Kubernetes Pod Security Standards:
+* **PHP / Laravel**: Copy [`presets/php-laravel/Dockerfile`](presets/php-laravel/Dockerfile) into your Laravel repo.
+* **Node.js**: Copy [`presets/nodejs/Dockerfile`](presets/nodejs/Dockerfile) into your Express/NestJS repo.
+* **Go**: Copy [`presets/golang/Dockerfile`](presets/golang/Dockerfile) for zero-CVE Distroless static binaries.
+* **Java**: Copy [`presets/java-spring/Dockerfile`](presets/java-spring/Dockerfile) for Spring Boot services.

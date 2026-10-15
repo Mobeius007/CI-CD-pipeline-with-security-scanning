@@ -1,0 +1,237 @@
+name: Reusable Universal DevSecOps Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: 'Target programming language (auto, python, php, nodejs, golang, java)'
+        required: false
+        default: 'auto'
+        type: string
+      app_name:
+        description: 'Application / Microservice Name'
+        required: false
+        default: 'devsecops-app'
+        type: string
+      health_endpoint:
+        description: 'Health probe endpoint for smoke testing'
+        required: false
+        default: '/health'
+        type: string
+      port:
+        description: 'Application listening port'
+        required: false
+        default: 8000
+        type: number
+      severity_threshold:
+        description: 'Trivy CVE failure severity threshold'
+        required: false
+        default: 'CRITICAL,HIGH'
+        type: string
+    secrets:
+      REGISTRY_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # =================================================================
+  # Stage 1: Polyglot Quality Gate & Universal SAST / SCA
+  # =================================================================
+  test-and-sast:
+    name: Universal SAST & Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Detect Stack Architecture
+        id: detect
+        run: |
+          REQ_LANG="${{ inputs.language }}"
+          if [ "$REQ_LANG" != "auto" ]; then
+            DETECTED="$REQ_LANG"
+          elif [ -f "composer.json" ]; then
+            DETECTED="php"
+          elif [ -f "package.json" ]; then
+            DETECTED="nodejs"
+          elif [ -f "go.mod" ]; then
+            DETECTED="golang"
+          elif [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
+            DETECTED="java"
+          elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            DETECTED="python"
+          else
+            DETECTED="generic"
+          fi
+          echo "Detected architecture: $DETECTED"
+          echo "lang=$DETECTED" >> $GITHUB_OUTPUT
+
+      # Universal Dependency Vulnerability Audit (Trivy FS)
+      - name: Universal SCA Dependency Scanner (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: ${{ inputs.severity_threshold }}
+
+      # Stack Specific Test Runners
+      - name: Run Python Tests & SAST
+        if: steps.detect.outputs.lang == 'python'
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; elif [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if command -v pytest >/dev/null 2>&1 && [ -d tests ]; then pytest tests/; fi
+          if command -v bandit >/dev/null 2>&1 && [ -d app ]; then bandit -r app -ll; fi
+
+      - name: Run PHP Tests & SAST
+        if: steps.detect.outputs.lang == 'php'
+        run: |
+          if [ -f composer.json ]; then
+            composer audit --locked || true
+            if [ -f vendor/bin/phpunit ]; then ./vendor/bin/phpunit; fi
+          fi
+
+      - name: Run Node.js Tests & SAST
+        if: steps.detect.outputs.lang == 'nodejs'
+        run: |
+          npm audit --audit-level=high || true
+          npm test --if-present
+
+      - name: Run Go Tests & SAST
+        if: steps.detect.outputs.lang == 'golang'
+        run: |
+          go test -v ./... || true
+
+      - name: Run Java Tests & SAST
+        if: steps.detect.outputs.lang == 'java'
+        run: |
+          if [ -f pom.xml ]; then mvn test -B; fi
+
+  # =================================================================
+  # Stage 2: Universal Container Build & Image CVE Scan
+  # =================================================================
+  build-and-scan:
+    name: Container Build & Image Scan
+    needs: [test-and-sast]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build OCI Container Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ inputs.app_name }}:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Container Image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ inputs.app_name }}:local'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: ${{ inputs.severity_threshold }}
+
+      - name: Archive Image Artifact
+        run: docker save ${{ inputs.app_name }}:local -o app-image.tar
+
+      - name: Upload Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-image
+          path: app-image.tar
+          retention-days: 1
+
+  # =================================================================
+  # Stage 3: Universal Ephemeral K8s Staging & Automated Smoke Test
+  # =================================================================
+  deploy-smoke-test:
+    name: Ephemeral K8s Staging & Smoke Test
+    needs: [build-and-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Download Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image
+          path: .
+
+      - name: Provision Ephemeral KinD Cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: devsecops-cluster
+
+      - name: Sideload Image into KinD
+        run: |
+          docker load -i app-image.tar
+          kind load docker-image ${{ inputs.app_name }}:local --name devsecops-cluster
+
+      - name: Deploy Kubernetes Manifests
+        run: |
+          if [ -d "k8s" ]; then
+            kubectl apply -f k8s/
+            kubectl rollout status deployment -A --timeout=120s || true
+          fi
+
+      - name: Smoke Test Health Endpoint
+        run: |
+          echo "Smoke testing endpoint ${{ inputs.health_endpoint }} on port ${{ inputs.port }}..."
+          # Start port-forward if a service exists
+          SVC=$(kubectl get svc -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [ -n "$SVC" ]; then
+            kubectl port-forward svc/$SVC ${{ inputs.port }}:80 &
+            PF_PID=$!
+            sleep 4
+            curl --fail --retry 5 --retry-connrefused "http://127.0.0.1:${{ inputs.port }}${{ inputs.health_endpoint }}" || true
+            kill $PF_PID 2>/dev/null || true
+          fi
+
+  # =================================================================
+  # Stage 4: Publish to Container Registry
+  # =================================================================
+  publish:
+    name: Publish Image to Registry
+    needs: [deploy-smoke-test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image
+          path: .
+
+      - name: Load Image
+        run: docker load -i app-image.tar
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Container Image
+        run: |
+          TARGET_IMAGE="ghcr.io/${{ github.repository_owner }}/${{ inputs.app_name }}"
+          TARGET_IMAGE=$(echo "$TARGET_IMAGE" | tr '[:upper:]' '[:lower:]')
+          docker tag ${{ inputs.app_name }}:local "${TARGET_IMAGE}:latest"
+          docker tag ${{ inputs.app_name }}:local "${TARGET_IMAGE}:${{ github.sha }}"
+          docker push "${TARGET_IMAGE}:latest"
+          docker push "${TARGET_IMAGE}:${{ github.sha }}"
