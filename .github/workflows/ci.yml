@@ -1,0 +1,183 @@
+name: DevSecOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Least-privilege permissions by default
+permissions:
+  contents: read
+
+jobs:
+  # -------------------------------------------------------------
+  # Stage 1: Quality Gate & Static Application Security Testing
+  # -------------------------------------------------------------
+  test-and-sast:
+    name: Test & SAST (Bandit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Pytest unit tests
+        run: |
+          pytest -v tests/
+
+      - name: Run Bandit SAST security scan
+        run: |
+          bandit -r app -ll
+
+  # -------------------------------------------------------------
+  # Stage 2: Container Build & Vulnerability Scanning (Trivy)
+  # -------------------------------------------------------------
+  build-and-scan:
+    name: Build & Scan (Trivy)
+    needs: [test-and-sast]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image with Buildx
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: devsecops-demo:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy container vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'devsecops-demo:local'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Save Docker image to archive
+        run: |
+          docker save devsecops-demo:local -o devsecops-demo.tar
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: devsecops-demo.tar
+          retention-days: 1
+
+  # -------------------------------------------------------------
+  # Stage 3: Kubernetes Deployment & Smoke Testing (Kind)
+  # -------------------------------------------------------------
+  deploy-smoke-test:
+    name: Deploy & Smoke Test (Kind)
+    needs: [build-and-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: .
+
+      - name: Create local kind Kubernetes cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: devsecops-cluster
+
+      - name: Load image into kind cluster
+        run: |
+          docker load -i devsecops-demo.tar
+          kind load docker-image devsecops-demo:local --name devsecops-cluster
+
+      - name: Deploy Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/
+
+      - name: Wait for deployment rollout
+        run: |
+          kubectl rollout status deployment/devsecops-deployment --timeout=120s
+
+      - name: Smoke test service endpoint
+        run: |
+          kubectl port-forward svc/devsecops-service 8000:80 &
+          PORT_FORWARD_PID=$!
+          echo "Waiting for port forwarding to initialize..."
+          sleep 4
+          curl --fail --retry 5 --retry-connrefused --retry-delay 2 http://127.0.0.1:8000/health
+          echo "Smoke test successfully passed!"
+          kill $PORT_FORWARD_PID
+
+      - name: Rollback deployment on failure
+        if: failure()
+        run: |
+          echo "Deployment or smoke test failure encountered! Rolling back deployment..."
+          kubectl rollout undo deployment/devsecops-deployment
+          kubectl get pods -A
+          kubectl describe deployment devsecops-deployment
+          exit 1
+
+  # -------------------------------------------------------------
+  # Stage 4: Publish Container Image to GitHub Container Registry
+  # -------------------------------------------------------------
+  publish:
+    name: Publish to GHCR
+    needs: [deploy-smoke-test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load -i devsecops-demo.tar
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push container image
+        run: |
+          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/devsecops-demo"
+          IMAGE_NAME=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          docker tag devsecops-demo:local "${IMAGE_NAME}:latest"
+          docker tag devsecops-demo:local "${IMAGE_NAME}:${{ github.sha }}"
+          docker push "${IMAGE_NAME}:latest"
+          docker push "${IMAGE_NAME}:${{ github.sha }}"
