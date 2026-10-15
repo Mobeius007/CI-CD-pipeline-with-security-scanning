@@ -52,3 +52,6 @@ bandit_report.*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local Interview & Notes
+INTERVIEW_PREP.md
